@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Black Jeopardy</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #111; color: #fff; font-family: Arial, sans-serif; }
+    h1, h2 { text-align: center; }
+    .board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 1000px; margin: 20px auto; }
+    .cell { background: #0057b7; padding: 20px; text-align: center; font-size: 24px; border-radius: 8px; cursor: pointer; }
+    .cell.disabled { background: #333; pointer-events: none; }
+    #modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.95); justify-content: center; align-items: center; z-index: 9999; }
+    #modalContent { background: #fff; color: #000; padding: 40px; border-radius: 8px; width: 90vw; height: 90vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 28px; }
+    .scoreboard { text-align: center; margin: 20px; }
+    .scoreboard input { margin: 5px; padding: 10px; width: 100px; }
+    #answerText { display: none; margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Black Jeopardy</h1>
+  <h2 id="round">Jeopardy Round</h2>
+  <div class="scoreboard">
+    <label>Team 1: <input type="number" id="score1" value="0" /></label>
+    <label>Team 2: <input type="number" id="score2" value="0" /></label>
+    <label>Team 3: <input type="number" id="score3" value="0" /></label>
+    <button onclick="nextRound()">Next Round</button>
+    <button onclick="openFullscreen()">Full Screen</button>
+    <input type="file" id="upload" accept=".csv" />
+  </div>
+
+  <p style="text-align:center; font-size: 18px;">📁 Please upload your questions CSV file to start the game.</p>
+  <div class="board" id="gameBoard"></div>
+
+  <div id="modal">
+    <div id="modalContent">
+      <div id="questionText"></div>
+      <div id="answerText"></div>
+      <div style="margin-top: 20px;">
+        <button onclick="revealAnswer()">Reveal Answer</button>
+        <button onclick="closeModal(true)">Correct</button>
+        <button onclick="closeModal(false)">Incorrect</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="sound-correct" src="correct.mp3"></audio>
+  <audio id="sound-incorrect" src="incorrect.mp3"></audio>
+  <audio id="sound-daily-double" src="daily-double.mp3"></audio>
+
+  <script>
+    let questionsData = {};
+    document.getElementById('upload').addEventListener('change', function(e) {
+      const reader = new FileReader();
+      reader.onload = function() {
+        const lines = reader.result.split('\n');
+        lines.forEach(line => {
+          const [round, value, question, answer] = line.split(',');
+          if (!questionsData[round]) questionsData[round] = {};
+          questionsData[round][value] = { question, answer };
+        });
+        loadBoard();
+      };
+      reader.readAsText(e.target.files[0]);
+    });
+
+    const rounds = [
+      { name: 'Jeopardy Round', questions: [100, 200, 300, 400, 500] },
+      { name: 'Double Jeopardy', questions: [200, 400, 600, 800, 1000] },
+      { name: 'Final Jeopardy', questions: ['Final'] }
+    ];
+
+    const dailyDoubles = new Set(["0-3", "1-7"]);
+
+    let currentRound = 0;
+    let board = document.getElementById('gameBoard');
+    let modal = document.getElementById('modal');
+    let questionText = document.getElementById('questionText');
+    let answerText = document.getElementById('answerText');
+    let roundTitle = document.getElementById('round');
+    let selectedValue = 0;
+    let selectedAnswer = '';
+    let isDailyDouble = false;
+
+    function loadBoard() {
+      board.innerHTML = '';
+      roundTitle.textContent = rounds[currentRound].name;
+
+      if (rounds[currentRound].name === 'Final Jeopardy') {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.textContent = 'Final Jeopardy';
+        cell.onclick = () => showQuestion('Final Question: Insert here', 'Final Answer', 1000);
+        board.appendChild(cell);
+      } else {
+        for (let i = 0; i < 5; i++) {
+          rounds[currentRound].questions.forEach((value, j) => {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.textContent = `$${value}`;
+            const key = `${currentRound}-${i * rounds[currentRound].questions.length + j}`;
+            const isDD = dailyDoubles.has(key);
+            let question = `Question for $${value}`;
+            let answer = `Answer for $${value}`;
+            const roundKey = rounds[currentRound].name;
+            if (questionsData[roundKey] && questionsData[roundKey][value]) {
+              question = questionsData[roundKey][value].question;
+              answer = questionsData[roundKey][value].answer;
+            }
+            if (isDD) {
+              question = `Daily Double!\n${question}`;
+            }
+            cell.onclick = () => showQuestion(question, answer, value, cell, isDD);
+            board.appendChild(cell);
+          });
+        }
+      }
+    }
+
+    function showQuestion(text, answer, value, cell = null, isDD = false) {
+      selectedValue = value;
+      selectedAnswer = answer;
+      isDailyDouble = isDD;
+      if (isDD) {
+        const wager = prompt("Daily Double! Enter your wager:", value);
+        if (wager !== null && !isNaN(wager)) {
+          selectedValue = parseInt(wager);
+        }
+        document.getElementById('sound-daily-double').play();
+      }
+      questionText.textContent = text;
+      answerText.textContent = answer;
+      answerText.style.display = 'none';
+      modal.style.display = 'flex';
+      if (cell) cell.classList.add('disabled');
+    }
+
+    function revealAnswer() {
+      answerText.style.display = 'block';
+    }
+
+    function closeModal(correct) {
+      modal.style.display = 'none';
+      const team = prompt("Which team answered? (1, 2 or 3)");
+      const scoreBox = document.getElementById(`score${team}`);
+      if (scoreBox) {
+        let score = parseInt(scoreBox.value);
+        if (correct) {
+          score += selectedValue;
+          document.getElementById('sound-correct').play();
+        } else {
+          score -= selectedValue;
+          document.getElementById('sound-incorrect').play();
+        }
+        scoreBox.value = score;
+      }
+    }
+
+    function nextRound() {
+      if (currentRound < rounds.length - 1) {
+        currentRound++;
+        loadBoard();
+      } else {
+        alert('Game Over!');
+      }
+    }
+
+    function openFullscreen() {
+      const docElm = document.documentElement;
+      if (docElm.requestFullscreen) {
+        docElm.requestFullscreen();
+      } else if (docElm.mozRequestFullScreen) {
+        docElm.mozRequestFullScreen();
+      } else if (docElm.webkitRequestFullScreen) {
+        docElm.webkitRequestFullScreen();
+      } else if (docElm.msRequestFullscreen) {
+        docElm.msRequestFullscreen();
+      }
+    }
+
+    // loadBoard() removed to prevent blank board without CSV
+  </script>
+</body>
+</html>

@@ -26,11 +26,10 @@
     <label>Team 3: <input type="number" id="score3" value="0" /></label>
     <button onclick="nextRound()">Next Round</button>
     <button onclick="openFullscreen()">Full Screen</button>
-    <input type="file" id="upload" accept=".csv" />
+    
   </div>
 
-  <p style="text-align:center; font-size: 18px;">📁 Please upload your questions CSV file to start the game.</p>
-  <div class="board" id="gameBoard"></div>
+    <div class="board" id="gameBoard"></div>
 
   <div id="modal">
     <div id="modalContent">
@@ -49,19 +48,26 @@
   <audio id="sound-daily-double" src="daily-double.mp3"></audio>
 
   <script>
-    let questionsData = {};
-    document.getElementById('upload').addEventListener('change', function(e) {
-      const reader = new FileReader();
-      reader.onload = function() {
-        const lines = reader.result.split('\n');
-        lines.forEach(line => {
-          const [round, value, question, answer] = line.split(',');
-          if (!questionsData[round]) questionsData[round] = {};
-          questionsData[round][value] = { question, answer };
-        });
-        loadBoard();
-      };
-      reader.readAsText(e.target.files[0]);
+    let questionsData = {
+  'Jeopardy Round': {
+    100: { question: 'Who always brings Tupperware?', answer: 'Your Auntie' },
+    200: { question: 'Who asks who all gon’ be there?', answer: 'Your cousin' },
+    300: { question: 'Who plays spades with a grudge?', answer: 'Uncle Leon' },
+    400: { question: 'Who brings the jello salad?', answer: 'Aunt Cheryl' },
+    500: { question: 'Who sets the playlist?', answer: 'That one cousin with an AUX cord' }
+  },
+  'Double Jeopardy': {
+    200: { question: 'Who keeps showing up late?', answer: 'Your neighbor' },
+    400: { question: 'Who thinks they can cook?', answer: 'Your uncle' },
+    600: { question: 'Who prays too long over the food?', answer: 'Granddad' },
+    800: { question: 'Who always starts a debate?', answer: 'Cousin Marcus' },
+    1000: { question: 'Who stays on the dance floor?', answer: 'Aunt Trina' }
+  },
+  'Final Jeopardy': {
+    'Final': { question: 'What brings the family together?', answer: 'Love and food' }
+  }
+};
+          
     });
 
     const rounds = [
@@ -178,7 +184,7 @@
       }
     }
 
-    // loadBoard() removed to prevent blank board without CSV
+    loadBoard();
   </script>
 </body>
 </html>
